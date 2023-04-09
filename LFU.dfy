@@ -3,7 +3,7 @@ class LFUCache {
     var capacity : int;
     var minFreq : int;
     var m : map<int, (int, int)>; //key -> {value, freq}
-    var freqMap: map<int, set<int>>; //freq -> list of keys
+    var freqMap: map<int, set<int>>; //freq -> set of keys
 
      constructor(capacity: int)
         requires capacity >= 0;
@@ -11,18 +11,22 @@ class LFUCache {
     {
       this.capacity := capacity;
       this.minFreq := 0;
+      this.m := map[];
+      this.freqMap := map[];
     }
 
     predicate Valid()
       reads this;
+      // reads this.freqMap.Values;
     {
       // general value check
       this.capacity >= 0 && this.minFreq >= 0 && 
+      this.minFreq in this.freqMap &&
       // either both map are empty or both are not
-      (|m| == |this.freqMap| == 0 || (|m| > 0 && |freqMap| > 0)) && 
+      (|this.m| == |this.freqMap| == 0 || (|this.m| > 0 && |this.freqMap| > 0)) && 
       // for all keys in m, its freq must be in freqMap, and the freqMap[freq] array must contain key
       //TODO: when accessing the element in set, need to convert to multiset first
-      (|m| > 0 && |freqMap| > 0) ==> forall e :: e in m && m[e].1 in freqMap && (exists i :: 0 <= i < |this.freqMap[m[e].1]| && freqMap[m[e].1][i] == e) 
+      (|m| > 0 && |freqMap| > 0) ==> forall e :: e in m ==> (m[e].1 in freqMap && e in freqMap[m[e].1])
     } 
     
     //Remove element by a given value
@@ -48,35 +52,57 @@ class LFUCache {
       return newSet;
     }
 
-    method get(key: int) returns (value: int){
-      if(key in m){
+    method get(key: int) returns (value: int)
+      requires Valid();
+      requires |this.freqMap| > 0 ==> forall e :: e in m ==> m[e].1 in freqMap;
+      requires |this.freqMap| > 0 ==> forall e :: e in this.freqMap ==> |this.freqMap[e]| > 0;
+      requires |this.freqMap| > 0 ==> exists e :: e in this.freqMap ==> key in this.freqMap[e];
+      requires |this.freqMap| > 0 ==> key in this.m && key in this.freqMap[this.m[key].1];
+      requires |this.freqMap| > 0 ==> key in this.m && (this.m[key].1 + 1 !in this.freqMap || key !in this.freqMap[this.m[key].1 + 1]);
+      modifies this;
+      ensures Valid();
+      ensures key !in m ==> value == -1;
+      ensures key in old(m) ==> (key in m && value == m[key].0 && old(m[key]).1 == m[key].1 + 1); // freq should increment
+      ensures key in old(m) ==> (old(m[key]).1 !in freqMap) || (old(m[key]).1 in freqMap && key !in freqMap[old(m[key]).1]); // The freq should not in freqMap, or freqMap[freq] list should no longer contain the key
+      ensures forall oldKey :: oldKey in old(m) && oldKey in m && old(m[oldKey].0) == m[oldKey].0; // The cache key and value does not change.
+      // DO NOT need to check freqMap[freq+1] constains the key, as it is ensured by "ensures Valid(); && ensures key in m;" above.
+    {
+      if(key !in m || |this.freqMap| == 0){
         value := -1;
       }
       else{
         //update map with new freq
         value := m[key].0;
         var oldFreq := m[key].1;
+        assert key in this.freqMap[oldFreq];
         var newFreq := oldFreq + 1;
         m := m[key := (value, newFreq)];
         
         //remove from old frequency list
-        var oldFreqList := freqMap[oldFreq];
-        var removeList := Remove(oldFreqList, key);
-        freqMap := freqMap[oldFreq := removeList];
+        var oldFreqList := this.freqMap[oldFreq];
+        if |oldFreqList| == 1 {
+          this.freqMap := this.freqMap - {oldFreq};
+        } else {
+          var removeList := Remove(oldFreqList, key);
+          this.freqMap := this.freqMap[oldFreq := removeList];
+        }
         
-        //TODO: check if the new frequency exists. If not, create one
         //add to new frequency list
-        var newFreqList := freqMap[newFreq];
-        var addList := AddElement(newFreqList, key);
-        freqMap := freqMap[newFreq := addList];
+        if (newFreq in this.freqMap) {
+          var newFreqList := this.freqMap[newFreq];
+          assert key !in this.freqMap[newFreq];
+          var addList := AddElement(newFreqList, key);
+          this.freqMap := this.freqMap[newFreq := addList];
+        } else {
+          var newFreqList := {newFreq};
+          this.freqMap := this.freqMap[newFreq := newFreqList];
+        }
+
+        //update minFreq
+        if(oldFreq == this.minFreq){
+          minFreq := minFreq + 1;
+        }
       }
-      
-      //update minFreq
-      var minFreqList := freqMap[minFreq];
-      if(|minFreqList| == 0){
-        minFreq := minFreq + 1;
-      }
-      
       return value;
     }
     
@@ -132,4 +158,3 @@ method Main()
   print val;
   LFUCache.put(3,3);
 }
-   
