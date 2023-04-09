@@ -3,13 +3,26 @@ class LFUCache {
     var capacity : int;
     var minFreq : int;
     var m : map<int, (int, int)>; //key -> {value, freq}
-    var freq: map<int, array<int>>; //freq -> list of keys
+    var freqMap: map<int, array<int>>; //freq -> list of keys
 
      constructor(capacity: int)
         requires capacity >= 0;
+        ensures Valid();
     {
       this.capacity := capacity;
+      this.minFreq := 0;
     }
+
+    predicate Valid()
+      reads this;
+    {
+      // general value check
+      this.capacity >= 0 && this.minFreq >= 0 && 
+      // either both map are empty or both are not
+      (|m| == |this.freqMap| == 0 || (|m| > 0 && |freqMap| > 0)) && 
+      // for all keys in m, its freq must be in freqMap, and the freqMap[freq] array must contain key
+      (|m| > 0 && |freqMap| > 0) ==> forall e :: e in m && m[e].1 in freqMap && (exists i :: 0 <= i < this.freqMap[m[e].1].Length && freqMap[m[e].1][i] == e) 
+    } 
     
     //Remove element by a given value
     method RemoveByValue(a: array<int>, element: int) returns (newArray: array<int>)
