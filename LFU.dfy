@@ -11,17 +11,22 @@ class LFUCache {
     {
       this.capacity := capacity;
       this.minFreq := 0;
+      this.m := map[];
+      this.freqMap := map[];
     }
 
     predicate Valid()
       reads this;
+      reads this.freqMap.Values;
     {
       // general value check
       this.capacity >= 0 && this.minFreq >= 0 && 
+      this.minFreq in this.freqMap &&
       // either both map are empty or both are not
-      (|m| == |this.freqMap| == 0 || (|m| > 0 && |freqMap| > 0)) && 
+      (|this.m| == |this.freqMap| == 0 || (|this.m| > 0 && |this.freqMap| > 0)) && 
       // for all keys in m, its freq must be in freqMap, and the freqMap[freq] array must contain key
-      (|m| > 0 && |freqMap| > 0) ==> forall e :: e in m && m[e].1 in freqMap && (exists i :: 0 <= i < this.freqMap[m[e].1].Length && freqMap[m[e].1][i] == e) 
+      (|this.m| > 0 && |this.freqMap| > 0) ==> forall e :: e in this.m ==> (this.m[e].1 in this.freqMap && (exists i :: 0 <= i < this.freqMap[this.m[e].1].Length && this.freqMap[this.m[e].1][i] == e)) &&
+      |this.freqMap| > 0 ==> forall e :: e in this.freqMap ==> (this.freqMap[e].Length > 0)
     } 
     
     //Remove element by a given value
@@ -91,12 +96,17 @@ class LFUCache {
 
     method get(key: int) returns (value: int)
       requires Valid();
+      requires |this.freqMap| > 0 ==> forall e :: e in m ==> m[e].1 in freqMap;
+      requires |this.freqMap| > 0 ==> forall e :: e in this.freqMap ==> this.freqMap[e].Length > 0
       modifies this;
       ensures Valid();
       ensures key !in m ==> value == -1;
-      ensures key in old(m) ==> (key in m && value == m[key].0 && old(m[key]).1 == m[key].1 + 1);
+      ensures key in old(m) ==> (key in m && value == m[key].0 && old(m[key]).1 == m[key].1 + 1); // freq should increment
+      ensures key in old(m) ==> old(m[key]).1 in freqMap && forall i :: 0 <= i < freqMap[old(m[key]).1].Length && freqMap[old(m[key]).1][i] != key; // The freqMap[freq] list should no longer contain the key
+      ensures forall oldKey :: oldKey in old(m) && oldKey in m && old(m[oldKey].0) == m[oldKey].0; // The cache key and value does not change.
+      // DO NOT need to check freqMap[freq+1] constains the key, as it is ensured by "ensures Valid(); && ensures key in m;" above.
     {
-      if(key !in m){
+      if(key !in m || |this.freqMap| == 0){
         value := -1;
       }
       else{
@@ -108,21 +118,29 @@ class LFUCache {
         
         //remove from old frequency list
         var oldFreqList := this.freqMap[oldFreq];
-        var removeList := RemoveByValue(oldFreqList, key);
-        this.freqMap := this.freqMap[oldFreq := removeList];
+        if oldFreqList.Length == 1 {
+          this.freqMap := this.freqMap - {oldFreq};
+        } else {
+          var removeList := RemoveByValue(oldFreqList, key);
+          this.freqMap := this.freqMap[oldFreq := removeList];
+        }
         
         //add to new frequency list
-        var newFreqList := this.freqMap[newFreq];
-        var addList := AddElement(newFreqList, key);
-        this.freqMap := this.freqMap[newFreq := addList];
+        if (newFreq in this.freqMap) {
+          var newFreqList := this.freqMap[newFreq];
+          var addList := AddElement(newFreqList, key);
+          this.freqMap := this.freqMap[newFreq := addList];
+        } else {
+          var newFreqList := new int[1];
+          newFreqList[0] := newFreq;
+          this.freqMap := this.freqMap[newFreq := newFreqList];
+        }
+
+        //update minFreq
+        if(oldFreq == this.minFreq){
+          minFreq := minFreq + 1;
+        }
       }
-      
-      //update minFreq
-      var minFreqList := this.freqMap[minFreq];
-      if(minFreqList.Length == 0){
-        minFreq := minFreq + 1;
-      }
-      
       return value;
     }
     
@@ -139,11 +157,11 @@ class LFUCache {
       else{
         //cache is full
         if(|m| == capacity){
-          var oldLFUList := freq[minFreq];
+          var oldLFUList := this.freqMap[minFreq];
           
           //update freq by removing the LFU element
           var newLFUList, LFUElement := RemoveByIndex(oldLFUList, 0);
-          freq := freq[minFreq := newLFUList];
+          this.freqMap := this.freqMap[minFreq := newLFUList];
 
           //update map by removing the LFU element
           m := m - {LFUElement};
@@ -155,9 +173,9 @@ class LFUCache {
         m := m + new_m;
 
         //update freq
-        var LFUListOne := freq[1];
+        var LFUListOne := this.freqMap[1];
         var newLFUListOne := AddElement(LFUListOne, key);
-        freq := freq[1 := newLFUListOne];
+        this.freqMap := this.freqMap[1 := newLFUListOne];
 
         //update minFreq
         minFreq := 1;
