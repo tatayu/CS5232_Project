@@ -26,11 +26,13 @@ class LFUCache {
     
     //Remove element by a given value
     method RemoveByValue(a: array<int>, element: int) returns (newArray: array<int>)
+      requires a.Length > 0;
     {
       newArray := new int[a.Length - 1];
       var i := 0;
       var j := 0;
       while i < a.Length
+       decreases a.Length - i;
       {
         if(a[i] != element){
           newArray[j] := a[i];
@@ -43,19 +45,31 @@ class LFUCache {
 
     //Remove element by a given index
     method RemoveByIndex(a: array<int>, index: int) returns (newArray: array<int>, element: int)
+      requires a.Length > 0;
+      requires index < a.Length;
+      ensures exists i :: 0 <= i < a.Length && a[i] == element; // Element belonged to a
+      ensures newArray.Length == a.Length + 1; // new_array has correct size
+      ensures forall i :: (exists j :: 0 <= i < newArray.Length && 0 <= j < a.Length && newArray[i] == a[j]); // all elements in new_array are in a
+      ensures forall i :: 0 <= i < newArray.Length && newArray[i] != element; // the removed element not in new_array
     {
       newArray := new int[a.Length - 1];
+      
       var i := 0;
       var j := 0;
       while i < a.Length
+        decreases a.Length - i;
+        invariant i < index ==> i == j;
+        invariant i >= index ==> (i == j + 1 || i == j == 0);
+        invariant j < newArray.Length;
       {
         if(i != index){
+          assert newArray.Length == a.Length-1;
           newArray[j] := a[i];
-          i := i + 1;
           j := j + 1;
         }else{
           element := a[i];
         }
+        i := i + 1;
       }
       return newArray, element;
     }
@@ -75,8 +89,14 @@ class LFUCache {
       return newArray;
     }
 
-    method get(key: int) returns (value: int){
-      if(key in m){
+    method get(key: int) returns (value: int)
+      requires Valid();
+      modifies this;
+      ensures Valid();
+      ensures key !in m ==> value == -1;
+      ensures key in old(m) ==> (key in m && value == m[key].0 && old(m[key]).1 == m[key].1 + 1);
+    {
+      if(key !in m){
         value := -1;
       }
       else{
@@ -87,18 +107,18 @@ class LFUCache {
         m := m[key := (value, newFreq)];
         
         //remove from old frequency list
-        var oldFreqList := freq[oldFreq];
+        var oldFreqList := this.freqMap[oldFreq];
         var removeList := RemoveByValue(oldFreqList, key);
-        freq := freq[oldFreq := removeList];
+        this.freqMap := this.freqMap[oldFreq := removeList];
         
         //add to new frequency list
-        var newFreqList := freq[newFreq];
+        var newFreqList := this.freqMap[newFreq];
         var addList := AddElement(newFreqList, key);
-        freq := freq[newFreq := addList];
+        this.freqMap := this.freqMap[newFreq := addList];
       }
       
       //update minFreq
-      var minFreqList := freq[minFreq];
+      var minFreqList := this.freqMap[minFreq];
       if(minFreqList.Length == 0){
         minFreq := minFreq + 1;
       }
@@ -154,4 +174,3 @@ method Main()
   print val;
   LFUCache.put(3,3);
 }
-   
