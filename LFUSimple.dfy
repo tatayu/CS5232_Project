@@ -67,24 +67,6 @@ class LFUCache {
       assert forall k :: k in cacheMap.Items ==> cacheMap[lfuKey].1 <= cacheMap[k.0].1;
       return lfuKey;
     }
-
-    method getMin(m : map<int, (int, int)>) returns (out : int)
-      requires |m| >= 1;
-      requires forall e :: e in m ==> m[e].1 >= 1;
-      ensures forall e :: e in m ==> m[out].1 <= m[e].1;
-    {
-      var key :| key in m;
-      if (|m| > 1) {
-        assert m[key].1 > 0;
-        assert key in m;
-        assert |m - {key}| > -1;
-        var newKey := getMin( m - {key} );
-        out := (if m[key].1 < m[newKey].1 then key else newKey);
-        return out;
-      } else {
-        return key;
-      }
-    }
     
     //Remove element by a given value
     method Remove(oldSet: set<int>, element: int) returns (newSet: set<int>)
@@ -145,7 +127,26 @@ class LFUCache {
         ensures Valid();
        
      {
-       
+        if (key in cacheMap) {
+          var currFreq := cacheMap[key].1;
+          cacheMap := cacheMap[key := (value, currFreq)];
+        } else {
+          if (|cacheMap| < capacity) {
+            cacheMap := cacheMap[key := (value, 1)];
+          } else {
+            var LFUKey := getLFUKey();
+            assert LFUKey in cacheMap;
+            assert |cacheMap| == capacity;
+            ghost var oldMap := cacheMap;
+            var newMap := cacheMap - {LFUKey};
+            cacheMap := newMap;
+            assert newMap == cacheMap - {LFUKey};
+            assert LFUKey !in cacheMap;
+            assert LFUKey in oldMap;
+            assert |cacheMap| < |oldMap|; // ????
+            cacheMap := cacheMap[key := (value, 1)];
+          }
+        }
        
      }
  }
