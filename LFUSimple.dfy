@@ -67,33 +67,6 @@ class LFUCache {
       assert forall k :: k in cacheMap.Items ==> cacheMap[lfuKey].1 <= cacheMap[k.0].1;
       return lfuKey;
     }
-    
-    //Remove element by a given value
-    method Remove(oldSet: set<int>, element: int) returns (newSet: set<int>)
-      requires |oldSet| > 0
-      requires element in oldSet
-      ensures |oldSet| - |newSet| == 1
-      ensures element !in newSet
-      ensures forall e :: e in newSet ==> e in oldSet;
-      ensures forall e :: e in oldSet && e != element ==> e in newSet;
-    {
-      var elementSet := {element};
-      newSet := oldSet - elementSet;
-      return newSet;
-    }
-
-    //Add element to the last of the array
-    method AddElement(oldSet: set<int>, element: int) returns (newSet: set<int>)
-      requires element !in oldSet
-      ensures |newSet| - |oldSet| == 1
-      ensures element in newSet
-      ensures forall e :: e in oldSet ==> e in newSet;
-      ensures forall e :: e in newSet && e != element ==> e in oldSet;
-    {
-      var elementSet := {element};
-      newSet := oldSet + elementSet;
-      return newSet;
-    }
 
     method get(key: int) returns (value: int)
       requires Valid();
@@ -116,6 +89,9 @@ class LFUCache {
         var newV := (value, oldFreq + 1);
         cacheMap := cacheMap[key := newV];
       }
+      print "after get: ";
+      print cacheMap;
+      print "\n";
       return value;
     }
     
@@ -150,7 +126,9 @@ class LFUCache {
             cacheMap := cacheMap[key := (value, 1)];
           }
         }
-       
+        print "after put: ";
+        print cacheMap;
+        print "\n";
      }
  }
 
@@ -172,11 +150,24 @@ class LFUCache {
 
  method Main()
  {
-  //  var LFUCache := new LFUCache(2);
-  //  LFUCache.put(1,1);
-  //  assert((|LFUCache.m| == 0 <==> |LFUCache.freqMap| == 0) || (|LFUCache.m| > 0 <==> |LFUCache.freqMap| > 0));
-  //  LFUCache.put(2,2);
-  //  var val := LFUCache.get(1);
-  //  print val;
-  //  LFUCache.put(3,3);
+   var LFUCache := new LFUCache(5);
+   LFUCache.put(1,1);
+   LFUCache.put(2,2);
+   LFUCache.put(3,3);
+   var val := LFUCache.get(1);
+   print "get(1): ";
+   print val;
+   print "\n";
+   LFUCache.put(3,5);
+   val := LFUCache.get(3);
+   print "get(3): ";
+   print val;
+   print "\n";
+   LFUCache.put(4,6);
+   LFUCache.put(5,7);
+   LFUCache.put(10,100);
+   val := LFUCache.get(2);
+   print "get(2): ";
+   print val;
+   print "\n";
  }
