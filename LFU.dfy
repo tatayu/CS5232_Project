@@ -33,7 +33,7 @@ class LFUCache {
       ((|m| > 0 && |freqMap| > 0) ==> (
         (forall e, f :: e in m && f in m && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1])) 
       )) &&
-      (forall a, b :: a in m && b in m ==> a !=b) &&
+      // (forall a, b :: a in m && b in m ==> a !=b) &&
       ((|this.m| > 0 && |this.freqMap| > 0) ==> this.minFreq in this.freqMap && |this.freqMap[this.minFreq]| > 0)
     } 
     
@@ -110,6 +110,7 @@ class LFUCache {
         //remove from old frequency list
         var oldFreqList := this.freqMap[oldFreq];
         if |oldFreqList| == 1 {
+          assert key in oldFreqList;
           // assert forall e :: (e in this.m && e != key && this.m[e].1 == this.m[key].1) ==> e in this.freqMap[this.m[key].1];
           // assert forall e :: (e in this.m && e != key && this.m[e].1 != old(this.m[key].1)) ==> e !in this.freqMap[old(this.m[key].1)]; // Need to use old()
           // assert forall e :: (e in this.m && e != key) ==> (this.m[e].1 in this.freqMap);
