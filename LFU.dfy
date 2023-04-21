@@ -6,7 +6,7 @@ class LFUCache {
     var freqMap: map<int, set<int>>; //freq -> set of keys
 
     constructor(capacity: int)
-      requires capacity >= 0;
+      requires 4 >= capacity > 0;
       ensures Valid();
     {
       this.capacity := capacity;
@@ -20,18 +20,38 @@ class LFUCache {
       // reads this.freqMap.Values;
     {
       // general value check
-      this.capacity >= 0 && this.minFreq >= 0 && 
+      4 >= this.capacity > 0 && this.minFreq >= 0 && 
+      |freqMap.Keys| <= |m| <= this.capacity &&
+      // minFreq is valid
       ((|m| > 0 && |freqMap| > 0) ==> this.minFreq in this.freqMap) &&
       // either both map are empty or both are not
       ((|this.m| == 0 <==> |this.freqMap| == 0 )|| (|this.m| > 0 <==> |this.freqMap| > 0)) && 
       // for all keys in m, its freq must be in freqMap, and the freqMap[freq] array must contain key
       ((|m| > 0 && |freqMap| > 0) ==> forall e :: e in m ==> (m[e].1 in freqMap && e in freqMap[m[e].1])) &&
       // for all keys in m, there should be one and only one set in freqMap contains the key.
-      ((|m| > 0 && |freqMap| > 0) ==> (forall e, f :: e in m && f in m && e != f && m[e].1 != m[f].1 ==> (f !in freqMap[m[e].1]))) &&
       ((|m| > 0 && |freqMap| > 0) ==> (forall e, f :: e in m && f in freqMap && m[e].1 != f ==> (e !in freqMap[f]))) &&
+      // for all keys in m, it should be in the set of the corresponding frequency in freqMap
+      ((|m| > 0 && |freqMap| > 0) ==> (forall e, f :: e in m && f in freqMap && m[e].1 == f ==> (e in freqMap[f]))) &&
+
+
+      // for all frequencies in freqMap, their freq set must not be empty
+      ((|m| > 0 && |freqMap| > 0) ==> (forall e :: e in freqMap ==> |freqMap[e]| > 0)) &&
+      // for all frequencies in freqMap, they must be belonging to some keys
+      ((|m| > 0 && |freqMap| > 0) ==> (forall e :: e in freqMap ==> (exists f :: f in m ==> m[f].1 == e && f in freqMap[e]))) &&
+      // for all sets in freqMap, if a key is not in m, it is in none of the sets
+      ((|m| > 0 && |freqMap| > 0) ==> (forall e :: e in freqMap ==> (forall nk :: nk !in m ==> nk !in freqMap[e]))) &&
+      // for all sets in freqMap, all its elements must be in m
+      ((|m| > 0 && |freqMap| > 0) ==> (forall e :: e in freqMap ==> (forall k :: k in freqMap[e] ==> k in m))) &&
       // if e's freq is unique, then in freqMap[freq], there should be only 1 element that is e
+      // ((|m| > 0 && |freqMap| > 0) ==> (
+      //   (forall e, f :: e in m && f in m && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1]) && (m[e].1 != m[f].1)) 
+      // )) &&
       ((|m| > 0 && |freqMap| > 0) ==> (
-        (forall e, f :: e in m && f in m && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1])) 
+        (forall e, f :: e in m && f in m && e != f && (m[e].1 != m[f].1) ==> (e !in freqMap[m[f].1] && f !in freqMap[m[e].1])) 
+      )) &&
+      // for all sets in freqMap, if all of their size is 1, then it means the size of m == size of freqMap, and vice versa
+      ((|m| > 0 && |freqMap| > 0) ==> (
+        ((forall e :: e in freqMap && |freqMap[e]| == 1) <==> (|m| == |freqMap.Keys|) )
       )) &&
       // (forall a, b :: a in m && b in m ==> a !=b) &&
       ((|this.m| > 0 && |this.freqMap| > 0) ==> this.minFreq in this.freqMap && |this.freqMap[this.minFreq]| > 0)
@@ -45,6 +65,7 @@ class LFUCache {
       ensures element !in newSet
       ensures forall e :: e in newSet ==> e in oldSet;
       ensures forall e :: e in oldSet && e != element ==> e in newSet;
+      ensures forall e :: e !in oldSet ==> e !in newSet;
     {
       var elementSet := {element};
       newSet := oldSet - elementSet;
@@ -66,113 +87,96 @@ class LFUCache {
 
     method get(key: int) returns (value: int)
       requires Valid();
-      requires |this.freqMap| > 0 ==> forall e :: e in m ==> m[e].1 in freqMap;
-      requires |this.freqMap| > 0 ==> forall e :: e in this.freqMap ==> |this.freqMap[e]| > 0;
-      requires |this.freqMap| > 0 ==> exists e :: e in this.freqMap && key in this.freqMap[e];
-      requires |this.freqMap| > 0 ==> key in this.m && key in this.freqMap[this.m[key].1];
-      requires |this.freqMap| > 0 ==> key in this.m && (this.m[key].1 + 1 !in this.freqMap || key !in this.freqMap[this.m[key].1 + 1]);
+      // requires |this.freqMap| > 0 ==> exists e :: e in this.freqMap && key in this.freqMap[e];
+      // requires |this.freqMap| > 0 ==> key in this.m && key in this.freqMap[this.m[key].1];
+      // requires |this.freqMap| > 0 ==> key in this.m && (this.m[key].1 + 1 !in this.freqMap || key !in this.freqMap[this.m[key].1 + 1]);
       modifies this;
       ensures Valid();
       ensures key !in m ==> value == -1;
       ensures key in old(m) ==> (key in m && value == m[key].0 && old(m[key].1) == (m[key].1 - 1)); // freq should increment
-      ensures key in old(m) ==> (old(m[key]).1 !in freqMap) || (old(m[key]).1 in freqMap && key !in freqMap[old(m[key]).1]); // The freq should not in freqMap, or freqMap[freq] list should no longer contain the key
+      ensures key in old(m) ==> m[key].0 == old(m[key].0); // no change in value
+      ensures |m| == |old(m)| // no change in cache size
+      ensures forall e :: e in old(m) && e != key ==> e in m && m[e] == old(m[e]); // Other keys do not change
+      ensures key in old(m) ==> (old(m[key].1) !in freqMap) || (old(m[key].1) in freqMap && key !in freqMap[old(m[key].1)]); // The old freq should not be in freqMap, or new freqMap[freq] list should no longer contain the key
+      ensures key in old(m) ==> (m[key].1 in freqMap && key in freqMap[m[key].1]); // The new freq should be in freqMap, and the key should be in the set of the new freqMap
+      ensures key in old(m) ==> forall e :: e in freqMap && e != m[key].1 ==> key !in freqMap[e]; // The key should not be in another other freq set if the freq mismatches
       ensures forall oldKey :: oldKey in old(m) ==> oldKey in m && old(m[oldKey].0) == m[oldKey].0; // The cache key and value does not change.
       // DO NOT need to check freqMap[freq+1] constains the key, as it is ensured by "ensures Valid(); && ensures key in m;" above.
     {
-      // assert (|m| > 0 && |freqMap| > 0) ==> forall e :: e in m ==> (m[e].1 in freqMap && e in freqMap[m[e].1]);
       // assert (|m| > 0 && |freqMap| > 0) ==> (forall e, f :: e in m && f in m && e != f && m[e].1 != m[f].1 ==> (f !in freqMap[m[e].1]));
       if(key !in m){
         value := -1;
       }
       else{
         //update map with new freq
-        assert (forall e, f :: e in m && f in m && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1]));
-        // assert forall e, f :: e in this.m && f in this.m && e != f && this.m[e].1 == this.m[f].1 ==> (f in this.freqMap[this.m[e].1]);
-        // assert forall e :: e in m ==> (m[e].1 in freqMap && e in freqMap[m[e].1]);
-        // assert forall e :: (e in this.m  && e != key) ==> (this.m[e].1 in this.freqMap); // others are not affected
         value := m[key].0;
         var oldFreq := m[key].1;
-        // assert key in this.freqMap[oldFreq];
         var newFreq := oldFreq + 1;
-        // assert (old(this.m[key].1) == this.m[key].1);
         this.m := this.m[key := (value, newFreq)];
-        // assert (oldFreq == m[key].1 - 1);
-        // assert this.m[key].1 == newFreq;
-        // assert old(this.m[key].1) == newFreq - 1;
-        // assert old(this.m[key].1) == oldFreq;
-        // assert old(this.m[key].1) == (this.m[key].1 - 1);
-        // assert forall e :: (e in this.m && e != key) ==> (this.m[e].1 in this.freqMap);
-        // assert forall e :: (e in this.m && e != key && this.m[e].1 == this.m[key].1) ==> e in this.freqMap[this.m[key].1];
-        // assert forall e :: (e in this.m && e != key && this.m[e].1 != old(this.m[key].1)) ==> e !in this.freqMap[old(this.m[key].1)]; // need to use old here, as we changed this.m[key].1 above.
-
-        // assert forall e :: e in this.m && e != key ==> (e in this.freqMap[this.m[e].1]);
 
         //remove from old frequency list
         var oldFreqList := this.freqMap[oldFreq];
+        assert oldFreqList == freqMap[old(m[key].1)];
         if |oldFreqList| == 1 {
-          assert key in oldFreqList;
-          // assert forall e :: (e in this.m && e != key && this.m[e].1 == this.m[key].1) ==> e in this.freqMap[this.m[key].1];
-          // assert forall e :: (e in this.m && e != key && this.m[e].1 != old(this.m[key].1)) ==> e !in this.freqMap[old(this.m[key].1)]; // Need to use old()
-          // assert forall e :: (e in this.m && e != key) ==> (this.m[e].1 in this.freqMap);
-          // assert oldFreqList == this.freqMap[old(this.m[key].1)];
-          // assert oldFreq == old(this.m[key].1);
+          // assert |oldFreqList| == 1 ==> (forall e, f :: e in oldFreqList && f in m && e != f ==> f !in oldFreqList);
+          // assert forall e :: e in m && e != key ==> (e !in oldFreqList);
           // assert key in oldFreqList;
-          // assert forall e :: (e in this.m && e != key) ==> (e !in oldFreqList); 
-          // assert oldFreq in this.freqMap;
-          // assert key in this.freqMap[oldFreq];
-          // assert old(this.m[key].1) in this.freqMap;
-          // assert |this.freqMap[old(this.m[key].1)]| == 1;
-          // assert forall e :: (e in this.m  && e != key) ==> this.m[e].1 != oldFreq;
+          // assert forall otherKey :: otherKey in m.Keys && otherKey != key ==> otherKey !in oldFreqList;
+          // assert forall e, f :: e in m && f in m && e != key && f != key && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1]);
+          assert |freqMap| <= |m|;
+          setUniqness(oldFreqList, key);
           this.freqMap := this.freqMap - {oldFreq};
-          // assert oldFreq !in this.freqMap;
-          // assert forall e :: (e in this.m  && e != key) ==> (this.m[e].1 in this.freqMap);
-          // assert forall e :: e in this.m && e != key ==> (e in this.freqMap[this.m[e].1]);
+          // assert forall e :: e in m && e != key ==> (m[e].1 in freqMap && e in freqMap[m[e].1]); // others freqMap not changed
+          // assert forall e :: (e in m && e != key) ==> (old(m[e]) == m[e]); // others not changed
+          // assert forall e, f :: e in m && f in m && e != key && f != key && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1]); // For other keys, set uniqueness holds still
+          assert |freqMap.Keys| < |m|;
         } else {
-          // assert forall e :: (e in this.m  && e != key) ==> (this.m[e].1 in this.freqMap);
-          // assert oldFreq in this.freqMap;
-          // assert key in oldFreqList;
-          var removeList := Remove(oldFreqList, key);
-          // assert key !in removeList;
-          // assert forall e :: e in removeList ==> e in oldFreqList;
-          // assert forall e :: e in oldFreqList && e != key ==> e in removeList;
-          this.freqMap := this.freqMap[oldFreq := removeList];
-          // assert forall e :: e in this.m && e != key ==> (e in this.freqMap[this.m[e].1]);
-          // assert key !in this.freqMap[oldFreq];
+          assert key in oldFreqList;
+          // assert forall e, f :: e in m && f in m && e != key && f != key && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1]); // For other keys, set uniqueness holds still
+          var newList := Remove(oldFreqList, key);
+          assert oldFreqList == newList + {key};
+          assert forall e :: e in oldFreqList && e != key ==> e in newList;
+          assert forall e :: e in newList ==> e in m.Keys;
+          // assert |newList| == 1 ==> (forall e, f :: e in newList && f in m.Keys && e != f ==> f !in newList);
+          this.freqMap := this.freqMap[oldFreq := newList];
+          assert forall e :: e in freqMap && e != oldFreq ==> old(freqMap[e]) == freqMap[e];
+          assert |freqMap.Keys| <= |m|;
+          assert forall e :: e in old(freqMap[oldFreq]) && e != key ==> e in freqMap[oldFreq];
+          // assert forall e, f :: e in m && f in m && e != key && f != key && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1]);
         }
-        // assert forall e :: (e in this.m  && e != key) ==> (this.m[e].1 in this.freqMap);
-        
-        // assert forall e :: e in this.m && e != key ==> (this.m[e].1 == old(this.m[e].1));
-        // assert forall e :: e in this.m && e != key ==> (e in this.freqMap[this.m[e].1]);
+        // assert forall e, f :: e in m && f in m && e != key && f != key && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1]); // For other keys, set uniqueness holds still
+        // assert forall e :: e in m && e != key ==> (m[e].1 in freqMap && e in freqMap[m[e].1]);
         //add to new frequency list
         if (newFreq in this.freqMap) {
           var newFreqList := this.freqMap[newFreq];
           // assert key !in this.freqMap[newFreq];
           var addList := AddElement(newFreqList, key);
           this.freqMap := this.freqMap[newFreq := addList];
+          // assert forall e :: e in m ==> (m[e].1 in freqMap && e in freqMap[m[e].1]);
         } else {
           var newFreqList := {key};
           this.freqMap := this.freqMap[newFreq := newFreqList];
-          
+          // assert forall e :: e in m ==> (m[e].1 in freqMap && e in freqMap[m[e].1]);
         }
-        // assert key in this.freqMap[newFreq];
-        // assert this.m[key].1 in this.freqMap;
-        // assert forall e :: e in this.m ==> (this.m[e].1 in this.freqMap);
-        // assert forall e, f :: e in this.m && f in this.m && e != f && this.m[e].1 == this.m[f].1 ==> (f in this.freqMap[this.m[e].1]);
-        // assert forall e, f :: e in this.m && f in this.m && e != f && this.m[e].1 != this.m[f].1 ==> (f !in this.freqMap[this.m[e].1]);
-
+        assert forall e :: e in freqMap && |freqMap[e]| == 1 <==> (|m| == |freqMap.Keys|);
         //update minFreq
         if(oldFreq == this.minFreq && oldFreq !in freqMap){
           minFreq := minFreq + 1;
         }
-
-        // assert forall e :: e in this.m ==> (this.m[e].1 in this.freqMap);
-        // assert forall e :: e in this.m ==> (this.m[e].1 in this.freqMap && e in this.freqMap[m[e].1]);
-        assert (forall e, f :: e in m && f in m && e != f ==> (|freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1])));
+        // assert forall e :: e in m ==> (m[e].1 in freqMap && e in freqMap[m[e].1]);
+        // assert forall e, f :: e in m && f in m && e != f && |freqMap[m[e].1]| == 1 ==> (f !in freqMap[m[e].1]);
       }
       // assert forall e :: (e in this.m && e != key && this.m[e].1 != this.m[key].1) ==> e !in this.freqMap[this.m[key].1];
       return value;
     }
     
+    lemma setUniqness(s:set<int>, item:int) 
+      requires |s| == 1 && item in s;
+      ensures s == {item};
+    {
+      ghost var newS := s - {item};
+      assert newS + {item} == s;
+    }
     
      method put(key: int, value: int)
        requires Valid();

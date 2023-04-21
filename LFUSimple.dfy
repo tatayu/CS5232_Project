@@ -17,7 +17,7 @@ class LFUCache {
     {
       // general value check
       this.capacity > 0 &&
-      // 0 <= |cacheMap| <= capacity &&
+      0 <= |cacheMap| <= capacity &&
       (|cacheMap| > 0 ==> (forall e :: e in cacheMap ==> cacheMap[e].1 >= 1)) && // frequency should always larger than 0
       (|cacheMap| > 0 ==> (forall e :: e in cacheMap ==> cacheMap[e].0 >= 0)) // only allow positive values
     } 
@@ -65,6 +65,7 @@ class LFUCache {
       assert forall e :: e in cacheMap.Items ==> minFreq <= e.1.1;
       assert forall k :: k in seenItems ==> cacheMap[lfuKey].1 <= cacheMap[k.0].1;
       assert forall k :: k in cacheMap.Items ==> cacheMap[lfuKey].1 <= cacheMap[k.0].1;
+      // assert forall k :: k in cacheMap ==> cacheMap[lfuKey].1 <= cacheMap[k].1; // ????
       return lfuKey;
     }
 
@@ -112,9 +113,8 @@ class LFUCache {
           } else {
             var LFUKey := getLFUKey();
             assert LFUKey in cacheMap;
-            // assert |cacheMap| == capacity;
+            assert |cacheMap| == capacity;
             ghost var oldMap := cacheMap;
-            // removeKeyFromMapCardinality(cacheMap, LFUKey);
             var newMap := cacheMap - {LFUKey};
             cacheMap := newMap;
             assert newMap == cacheMap - {LFUKey};
@@ -122,7 +122,7 @@ class LFUCache {
             assert LFUKey in oldMap;
             ghost var oldCard := |oldMap|;
             ghost var newCard := |newMap|;
-            // assert |cacheMap| < |oldMap|; // ????
+            assert |cacheMap.Keys| < |oldMap|; // ????
             cacheMap := cacheMap[key := (value, 1)];
           }
         }
@@ -131,22 +131,6 @@ class LFUCache {
         print "\n";
      }
  }
-
-// lemma removeKeyFromMapCardinality(aMap: map<int, (int, int)>, key: int) 
-//   requires key in aMap;
-//   requires |aMap| > 0;
-//   ensures |aMap - {key}| < |old(aMap)|;
-// {
-//     assert key in aMap;
-//     assert forall e :: e in aMap && e != key ==> e in aMap;
-//     ghost var newMap := aMap - {key};
-//     assert key !in newMap;
-//     assert forall e :: e in aMap && e != key ==> e in newMap;
-
-
-
-//     assert |newMap| < |aMap|;
-//  }
 
  method Main()
  {
