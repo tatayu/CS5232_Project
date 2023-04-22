@@ -22,7 +22,7 @@ class LFUCache {
       // general value check
       4 >= this.capacity > 0 
       && this.minFreq >= 0 && 
-      // |freqMap.Keys| <= |m| <= this.capacity &&
+      //|freqMap.Keys| <= |m| <= this.capacity &&
       // minFreq is valid
       ((|m.Keys| > 0 && |freqMap.Keys| > 0) ==> this.minFreq in this.freqMap) &&
       // either both map are empty or both are not
@@ -54,12 +54,14 @@ class LFUCache {
       // ((|m| > 0 && |freqMap| > 0) ==> (
       //   (exists e :: e in freqMap && |freqMap[e]| > 1 <==> |m| > |freqMap.Keys| )
       // )) &&
-      // (forall a, b :: a in m && b in m ==> a !=b) &&
+      //(forall a, b :: a in m && b in m ==> a !=b) &&
 
       // minFreq must be valid
       ((|this.m| > 0 && |this.freqMap| > 0) ==> this.minFreq in this.freqMap && |this.freqMap[this.minFreq]| > 0) &&
       // minFreq must be min
-      ((|this.m| > 0 && |this.freqMap| > 0) ==> (forall e :: e in freqMap && e != minFreq ==> minFreq <= e))
+      ((|this.m| > 0 && |this.freqMap| > 0) ==> (forall e :: e in freqMap && e != minFreq ==> minFreq <= e)) &&
+      // value must not equal to -1
+      ((|this.m| > 0 && |this.freqMap| > 0) ==> (forall k :: k in m.Keys ==> m[k].0 != -1)) 
     } 
     
     //Remove element by a given value
@@ -99,6 +101,7 @@ class LFUCache {
       ensures Valid();
       ensures key !in m.Keys ==> value == -1;
       ensures key in m.Keys ==> value != -1;
+      //ensures forall k :: k in m <==> k in old(m) ？？？
       ensures key in old(m) ==> (key in m && value == m[key].0 && old(m[key].1) == (m[key].1 - 1)); // freq should increment
       ensures key in old(m) ==> m[key].0 == old(m[key].0); // no change in value
       ensures |m.Keys| == |old(m.Keys)| // no change in cache size
@@ -107,7 +110,9 @@ class LFUCache {
       ensures key in old(m) ==> (m[key].1 in freqMap && key in freqMap[m[key].1]); // The new freq should be in freqMap, and the key should be in the set of the new freqMap
       ensures key in old(m) ==> forall e :: e in freqMap && e != m[key].1 ==> key !in freqMap[e]; // The key should not be in another other freq set if the freq mismatches
       ensures forall oldKey :: oldKey in old(m) ==> oldKey in m && old(m[oldKey].0) == m[oldKey].0; // The cache key and value does not change.
-      // DO NOT need to check freqMap[freq+1] constains the key, as it is ensured by "ensures Valid(); && ensures key in m;" above.
+      //DO NOT need to check freqMap[freq+1] constains the key, as it is ensured by "ensures Valid(); && ensures key in m;" above.
+      ensures capacity == old(capacity)
+      
     {
       // assert (|m| > 0 && |freqMap| > 0) ==> (forall e, f :: e in m && f in m && e != f && m[e].1 != m[f].1 ==> (f !in freqMap[m[e].1]));
       if(key !in m.Keys){
@@ -205,68 +210,81 @@ class LFUCache {
     //   assert forall e,f :: e in m1 && f in m2 && e != f && 
     // }
     
-    lemma mapUniqness(m: map<int, (int, int)>, key: int, value: int)
-      requires |m.Keys| > 1
-      requires key !in m.Keys
-      requires forall i, j :: |m.Keys| > 1 && i in m.Keys && j in m.Keys ==> i != j
-    {
-      ghost var newM := m + map[key := (value, 1)];
-      assert((forall i, j :: i in newM.Keys && j in newM.Keys ==> i != j));
-    }
+    // lemma mapUniqness(m: map<int, (int, int)>, key: int, value: int)
+    //   requires |m.Keys| > 1
+    //   requires key !in m.Keys
+    //   requires forall i, j :: |m.Keys| > 1 && i in m.Keys && j in m.Keys ==> i != j
+    // {
+    //   ghost var newM := m + map[key := (value, 1)];
+    //   assert((forall i, j :: i in newM.Keys && j in newM.Keys ==> i != j));
+    // }
+
 
      method put(key: int, value: int)
        requires Valid();
+       requires |freqMap.Keys| <= |m.Keys| <= this.capacity
        //key in map 
        requires (key in m.Keys) ==> (|freqMap.Keys| > 0 && |m.Keys| > 0 && minFreq > 0 && minFreq in freqMap.Keys && |freqMap[minFreq]| > 0 && key in freqMap[m[key].1] && minFreq <= m[key].1)
+       
        //key not in map and full capacity
        requires (key !in m.Keys && |m.Keys| == capacity) ==> (|freqMap.Keys| > 0 && |m.Keys| > 0 && minFreq > 0 && minFreq in freqMap.Keys && |freqMap[minFreq]| > 0) 
+       
        //key not in map but not full capacity
        requires (key !in m.Keys && 0 < |m.Keys| < capacity) ==> (|freqMap.Keys| > 0 && |m.Keys| > 0 && minFreq > 0 && minFreq in freqMap.Keys && |freqMap[minFreq]| > 0)
+       
        //key not in map and the map is empty
        requires (key !in m.Keys && |m.Keys| == 0) ==> (|freqMap.Keys| == 0 && |m.Keys| == 0 && minFreq !in freqMap.Keys)
-      //  requires |this.freqMap| > 0 ==> forall e :: e in this.freqMap ==> |this.freqMap[e]| > 0;
-      //  requires |this.freqMap| > 0 ==> exists e :: e in this.freqMap && key in this.freqMap[e];
+       //requires |this.freqMap| > 0 ==> forall e :: e in this.freqMap ==> |this.freqMap[e]| > 0;
+       //requires |this.freqMap| > 0 ==> exists e :: e in this.freqMap && key in this.freqMap[e];
         modifies this
         
         ensures Valid();
-        //ensures capacity == old(capacity)
+        ensures |freqMap.Keys| <= |m.Keys| <= this.capacity
+        ensures capacity == old(capacity)
         
         //key in map
-        ensures key in old(m.Keys) ==> key in m.Keys && m[key].0 == value && minFreq in freqMap
-        ensures key in old(m.Keys) ==>|m.Keys| == |old(m.Keys)| && freqMap.Keys == old(freqMap.Keys)
-        ensures key in old(m.Keys) ==> freqMap == old(freqMap) && minFreq == old(minFreq) && capacity == old(capacity)
+        ensures key in old(m) ==> key in m && m[key].0 == value && minFreq in freqMap
+        ensures key in old(m) ==>|m.Keys| == |old(m.Keys)| && forall k :: k in m <==> k in old(m)
+        ensures key in old(m) ==>|freqMap.Keys| == |old(freqMap.Keys)| && freqMap == old(freqMap) && minFreq == old(minFreq) && capacity == old(capacity)
         
         //key not in map and map is empty
-        ensures (key !in old(m.Keys) && old(|m.Keys|) == 0) ==> key in m.Keys && |m.Keys| == 1 && m[key].0 == value && m[key].1 == 1
-        ensures (key !in old(m.Keys) && old(|m.Keys|) == 0) ==> |old(freqMap.Keys)| == 0 && minFreq == 1 && minFreq in freqMap.Keys && |freqMap.Keys| == 1 && key in freqMap[minFreq] && |freqMap[minFreq]| == 1
-        //ensures (key !in old(m.Keys) && old(|m.Keys|) == 0) ==> {m[key]} == freqMap.Keys
-        //ensures (key !in old(m.Keys) && old(|m.Keys|) == 0) ==> capacity == old(capacity)
+        ensures (key !in old(m) && old(|m.Keys|) == 0) ==> key in m && |m.Keys| == 1 && m[key].0 == value && m[key].1 == 1
+        ensures (key !in old(m) && old(|m.Keys|) == 0) ==> && minFreq == 1 && minFreq in freqMap && |freqMap.Keys| == 1 && key in freqMap[minFreq] && |freqMap[minFreq]| == 1
+        ensures (key !in old(m) && old(|m.Keys|) == 0) ==> {m[key].1} == freqMap.Keys
+        ensures (key !in old(m) && old(|m.Keys|) == 0) ==> capacity == old(capacity)
         
         //key not in map but not full capacity
-        ensures (key !in old(m.Keys) && 0 < old(|m.Keys|) < capacity) ==> key in m.Keys && |m.Keys| <= capacity && |m.Keys| == |old(m.Keys)| + 1 && m[key].0 == value && m[key].1 == 1
-        ensures (key !in old(m.Keys) && 0 < old(|m.Keys|) < capacity) ==> forall k :: k in old(m.Keys) ==> k in m.Keys && m[k].0 == old(m[k].0) && m[k].1 == old(m[k].1) && m[k].1 in freqMap && k in freqMap[m[k].1]
-        ensures (key !in old(m.Keys) && 0 < old(|m.Keys|) < capacity) ==> |freqMap.Keys| <= |m.Keys| && minFreq == 1 && minFreq in freqMap.Keys && |freqMap.Keys| >= 1 && key in freqMap[minFreq] && |freqMap[minFreq]| >= 1
-        ensures (key !in old(m.Keys) && 0 < old(|m.Keys|) < capacity) ==> forall f :: f in old(freqMap.Keys) ==> f in freqMap.Keys
+        ensures (key !in old(m) && 0 < old(|m.Keys|) < capacity) ==> key in m && |m.Keys| <= capacity && |m.Keys| == |old(m.Keys)| + 1 && m[key].0 == value && m[key].1 == 1
+        ensures (key !in old(m) && 0 < old(|m.Keys|) < capacity) ==> forall k :: k in old(m) ==> k in m && m[k].0 == old(m[k].0) && m[k].1 == old(m[k].1) && m[k].1 in freqMap && k in freqMap[m[k].1]
+        ensures (key !in old(m) && 0 < old(|m.Keys|) < capacity) ==> |freqMap.Keys| <= |m.Keys| && minFreq == 1 && minFreq in freqMap.Keys && |freqMap.Keys| >= 1 && key in freqMap[minFreq] && |freqMap[minFreq]| >= 1
+        ensures (key !in old(m.Keys) && 0 < old(|m.Keys|) < capacity) ==> forall f :: f in old(freqMap) ==> f in freqMap
         ensures (key !in old(m.Keys) && 0 < old(|m.Keys|) < capacity) ==> capacity == old(capacity)
         
         //key not in map and full capacity
         ensures (key !in old(m.Keys) && old(|m.Keys|) == capacity) ==> key in m.Keys && |m.Keys| == capacity && |m.Keys| == |old(m.Keys)| && m[key].0 == value && m[key].1 == 1
         ensures (key !in old(m.Keys) && old(|m.Keys|) == capacity) ==> |freqMap.Keys| <= |m.Keys| && minFreq == 1 && minFreq in freqMap.Keys && |freqMap.Keys| >= 1 && key in freqMap[minFreq] && |freqMap[minFreq]| >= 1
         ensures (key !in old(m.Keys) && old(|m.Keys|) == capacity) ==> exists k :: forall f:: k in old(m.Keys) && f in freqMap.Keys ==> k !in m.Keys && k !in freqMap[f]
-        //ensures capacity == old(capacity)
+        ensures capacity == old(capacity)
 
      {
-       
+       ghost var old_keys := old(m);
        var val := get(key);
       //  assert(old(minFreq) in freqMap);
       //  assert(minFreq in freqMap);
       //  assert (old(minFreq) >= minFreq);
        
        if(val != -1){ //key in m && |this.freqMap| > 0 && |this.m| >0 0
-         assert (key in m.Keys);
-         var freq := this.m[key].1;
+         assert (key in m);
+         var freq := m[key].1;
          //update map with new value
-         this.m := this.m[key := (value, freq)];
+         m := m[key := (value, freq)];
+         ghost var new_keys := m;
+         //assert(forall k :: k in new_keys ==> k in old_keys);
+         assert(forall k :: k in old(m) ==> k in m);
+
+         assert(forall k :: k in m ==> k in old(m));
+         //assert(|m.Keys| == |old(m.Keys)|);
+         //assert(m.Keys == old(m.Keys));
          assert(capacity == old(capacity));
        } 
        else{
@@ -276,7 +294,6 @@ class LFUCache {
         //assert(minFreq in freqMap);
          //cache is full
          if(|this.m| == this.capacity){
-          //mapUniqness(m, key, value);
            var oldLFUList := this.freqMap[this.minFreq];
           
            //update freq by removing the LFU element
