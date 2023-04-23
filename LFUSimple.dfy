@@ -135,23 +135,34 @@ class LFUCache {
  method Main()
  {
    var LFUCache := new LFUCache(5);
+   print "Cache Capacity = 5 \n";
+   print "PUT (1, 1) - ";
    LFUCache.put(1,1);
+   print "PUT (2, 2) - ";
    LFUCache.put(2,2);
+   print "PUT (3, 3) - ";
    LFUCache.put(3,3);
+   print "GET (1) - ";
    var val := LFUCache.get(1);
-   print "get(1): ";
+   print "get(1) = ";
    print val;
    print "\n";
+   print "PUT (3, 5) - ";
    LFUCache.put(3,5);
+   print "GET (3) - ";
    val := LFUCache.get(3);
-   print "get(3): ";
+   print "get(3) = ";
    print val;
    print "\n";
+   print "PUT (4, 6) - ";
    LFUCache.put(4,6);
+   print "PUT (5, 7) - ";
    LFUCache.put(5,7);
+   print "PUT (10, 100) - ";
    LFUCache.put(10,100);
+   print "GET (2) - ";
    val := LFUCache.get(2);
-   print "get(2): ";
+   print "get(2) = ";
    print val;
    print "\n";
  }
