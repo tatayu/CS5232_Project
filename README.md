@@ -1,4 +1,4 @@
-# CS5233 Project -  Formal Specification and Verification of LFU Algorithms with Dafny
+# CS5232 Project -  Formal Specification and Verification of LFU Algorithms with Dafny
 
 ## Software Prerequisites
 
