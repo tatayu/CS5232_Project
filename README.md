@@ -15,7 +15,17 @@ Settings, set 'Dafny: Version' to `3.13.1` and restart Visual Studio Code.
 To set the time limit, got to the Extension Setting, set 'Dafny: Verification Time Limit' to 600 and restartd Visual Studio Code.
 
 ## LFU.dfy
-This code contains the implementation and verification of the LFU algorithm with O(1) time complexity. To run the program, go to the command palette (Ctrl + Shift + P), search for 'Dafny: run' and click on it. The program should be verified within a ??? seconds. The expected output is shown as below: 
+This code contains the implementation and verification of the LFU algorithm with O(1) time complexity. To run the program, go to the command palette (Ctrl + Shift + P), search for 'Dafny: run' and click on it. The program should be verified within 40 seconds. The expected output is shown as below: 
+
+Dafny program verifier finished with 12 verified, 0 errors <br>
+PUT (1, 1) - after put: map[1 := (1, 1)] <br>
+PUT (2, 2) - after put: map[1 := (1, 1), 2 := (2, 1)] <br>
+PUT (3, 3) - after put: map[2 := (2, 1), 3 := (3, 1)] <br>
+GET (2) - after get: map[2 := (2, 2), 3 := (3, 1)] <br>
+get(2) = 2 <br>
+PUT (2, 22) - after put: map[2 := (22, 2), 3 := (3, 1)] <br>
+GET (2) - after get: map[2 := (22, 3), 3 := (3, 1)] <br>
+get(2) = 22 <br>
 
 ## LFUSimple.dfy
 This code contains the implementation and verification of the LFU algorithm with O(N) time complexity. To run the program, go to the command palette (Ctrl + Shift + P), search for 'Dafny: run' and click on it. The program should be verified within a few seconds. The expected output is shown as below: 

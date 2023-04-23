@@ -289,28 +289,24 @@ class LFUCache {
 
  method Main()
  {
-   var LFUCache := new LFUCache(2);
-   print "PUT (1, 1) - ";
-   LFUCache.put(1,1);
-   print "PUT (2, 2) - ";
-   LFUCache.put(2,2);
-   print "GET (1) - ";
-   var val := LFUCache.get(1);
-   print "get(1) = ";
-   print val;
-   print "\n";
-   print "PUT (1, 3) - ";
-   LFUCache.put(1,3);
-   print "GET (1) - ";
-   val := LFUCache.get(1);
-   print "get(1) = ";
-   print val;
-   print "\n";
-   print "PUT (3, 5) - ";
-   LFUCache.put(3,5);
-  //  print "GET (2) - ";
-  //  val := LFUCache.get(2);
-  //  print "get(2) = ";
-  //  print val;
-  //  print "\n";
+    var LFUCache := new LFUCache(2);
+    print "PUT (1, 1) - ";
+    LFUCache.put(1,1);
+    print "PUT (2, 2) - ";
+    LFUCache.put(2,2);
+    print "PUT (3, 3) - ";
+    LFUCache.put(3,3);
+    print "GET (2) - ";
+    var val := LFUCache.get(2);
+    print "get(2) = ";
+    print val;
+    print "\n";
+    print "PUT (2, 22) - ";
+    LFUCache.put(2,22);
+    print "GET (2) - ";
+    val := LFUCache.get(2);
+    print "get(2) = ";
+    print val;
+    print "\n";
+   
  }
